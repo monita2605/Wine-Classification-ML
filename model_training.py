@@ -59,3 +59,4 @@ results_df = pd.DataFrame(results)
 results_df.to_csv("../model/model_metrics.csv", index=False)
 print(results_df)
 
+
