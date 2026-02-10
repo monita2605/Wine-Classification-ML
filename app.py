@@ -1,66 +1,121 @@
 import streamlit as st
-import pickle
+import pandas as pd
 import numpy as np
+import pickle
 import os
 
+from sklearn.metrics import (
+    accuracy_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    matthews_corrcoef,
+    confusion_matrix,
+    classification_report
+)
+
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 # ---------------------------
-# Load trained model
+# App Config
 # ---------------------------
-with open("model/logistic_regression.pkl", "rb") as f:
+st.set_page_config(page_title="Wine Classification", layout="wide")
+st.title("🍷 Wine Classification – ML Models")
+
+# ---------------------------
+# Model paths
+# ---------------------------
+MODEL_PATHS = {
+    "Logistic Regression": "model/logistic_regression.pkl",
+    "Decision Tree": "model/decision_tree.pkl",
+    "KNN": "model/knn.pkl",
+    "Naive Bayes": "model/naive_bayes.pkl",
+    "Random Forest": "model/random_forest.pkl",
+    "XGBoost": "model/xgboost.pkl"
+}
+
+# ---------------------------
+# Sidebar Controls
+# ---------------------------
+st.sidebar.header("⚙️ Controls")
+
+selected_model_name = st.sidebar.selectbox(
+    "Select Model",
+    list(MODEL_PATHS.keys())
+)
+
+uploaded_file = st.sidebar.file_uploader(
+    "Upload Test Dataset (CSV)",
+    type=["csv"]
+)
+
+# ---------------------------
+# Load Model
+# ---------------------------
+with open(MODEL_PATHS[selected_model_name], "rb") as f:
     model = pickle.load(f)
 
-# Load scaler
-with open("model/scaler.pkl", "rb") as f:
-    scaler = pickle.load(f)
+# ---------------------------
+# Load Metrics
+# ---------------------------
+metrics_df = pd.read_csv("model/model_metrics.csv")
+
+st.subheader("📊 Model Evaluation Metrics")
+st.dataframe(metrics_df, use_container_width=True)
 
 # ---------------------------
-# Streamlit UI
+# Dataset Upload & Prediction
 # ---------------------------
-st.set_page_config(page_title="Wine Classification", layout="centered")
-st.title("🍷 Wine Classification – Logistic Regression")
+if uploaded_file is not None:
+    data = pd.read_csv(uploaded_file)
 
-st.write("Enter the wine chemical properties below:")
+    if "target" not in data.columns:
+        st.error("❌ Uploaded CSV must contain a 'target' column")
+        st.stop()
 
-# Feature names (Wine dataset)
-feature_names = [
-    "Alcohol",
-    "Malic Acid",
-    "Ash",
-    "Alcalinity of Ash",
-    "Magnesium",
-    "Total Phenols",
-    "Flavanoids",
-    "Nonflavanoid Phenols",
-    "Proanthocyanins",
-    "Color Intensity",
-    "Hue",
-    "OD280/OD315 of Diluted Wines",
-    "Proline"
-]
+    X = data.drop("target", axis=1)
+    y_true = data["target"]
 
-inputs = []
+    # Prediction
+    y_pred = model.predict(X)
 
-# Create number inputs
-for feature in feature_names:
-    value = st.number_input(feature, value=0.0)
-    inputs.append(value)
+    # ---------------------------
+    # Metrics
+    # ---------------------------
+    st.subheader("✅ Test Dataset Performance")
 
-# ---------------------------
-# Prediction
-# ---------------------------
-if st.button("Predict Wine Class"):
-    values = np.array(inputs).reshape(1, -1)
+    col1, col2, col3 = st.columns(3)
 
-    # Safety check
-    if values.shape[1] != model.n_features_in_:
-        st.error(
-            f"Model expects {model.n_features_in_} features, "
-            f"but received {values.shape[1]}"
-        )
-    else:
-        # Scale input
-        values_scaled = scaler.transform(values)
+    col1.metric("Accuracy", f"{accuracy_score(y_true, y_pred):.4f}")
+    col2.metric("Precision", f"{precision_score(y_true, y_pred, average='weighted'):.4f}")
+    col3.metric("Recall", f"{recall_score(y_true, y_pred, average='weighted'):.4f}")
 
-        prediction = model.predict(values_scaled)
+    col4, col5 = st.columns(2)
+    col4.metric("F1 Score", f"{f1_score(y_true, y_pred, average='weighted'):.4f}")
+    col5.metric("MCC", f"{matthews_corrcoef(y_true, y_pred):.4f}")
 
-        st.success(f"🍷 Predicted Wine Class: {prediction[0]}")
+    # ---------------------------
+    # Confusion Matrix
+    # ---------------------------
+    st.subheader("🧩 Confusion Matrix")
+
+    cm = confusion_matrix(y_true, y_pred)
+
+    fig, ax = plt.subplots()
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax)
+    ax.set_xlabel("Predicted")
+    ax.set_ylabel("Actual")
+
+    st.pyplot(fig)
+
+    # ---------------------------
+    # Classification Report
+    # ---------------------------
+    st.subheader("📄 Classification Report")
+    report = classification_report(y_true, y_pred, output_dict=True)
+    report_df = pd.DataFrame(report).transpose()
+    st.dataframe(report_df, use_container_width=True)
+
+else:
+    st.info("📥 Upload a **test CSV file** to evaluate the selected model.")
