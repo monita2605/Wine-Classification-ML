@@ -9,8 +9,8 @@ from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier
 from xgboost import XGBClassifier
 
-train_df = pd.read_csv("../data/wine_train.csv")
-test_df = pd.read_csv("../data/wine_test.csv")
+train_df = pd.read_csv("wine_train.csv")
+test_df = pd.read_csv("wine_test.csv")
 
 X_train = train_df.drop("target", axis=1)
 y_train = train_df["target"]
@@ -58,5 +58,6 @@ print("DEBUG PICKLE CREATED")
 results_df = pd.DataFrame(results)
 results_df.to_csv("../model/model_metrics.csv", index=False)
 print(results_df)
+
 
 
