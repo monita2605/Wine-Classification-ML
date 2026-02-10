@@ -46,6 +46,11 @@ for name, model in models.items():
         "F1": f1_score(y_test, y_pred),
         "MCC": matthews_corrcoef(y_test, y_pred)
     })
+    import pickle
+with open("../model/debug_test.pkl", "wb") as f:
+    pickle.dump("working", f)
+
+print("DEBUG PICKLE CREATED")
 
     with open(f"../model/{name}.pkl", "wb") as f:
         pickle.dump(model, f)
@@ -53,3 +58,4 @@ for name, model in models.items():
 results_df = pd.DataFrame(results)
 results_df.to_csv("../model/model_metrics.csv", index=False)
 print(results_df)
+
