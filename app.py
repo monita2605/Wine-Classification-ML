@@ -115,8 +115,9 @@ report = classification_report(y_true, y_pred, output_dict=True)
 report_df = pd.DataFrame(report).transpose()
 st.dataframe(report_df, use_container_width=True)
 
-else:
-st.info("📥 Upload a **test CSV file** to evaluate the selected model.")
+#else:
+#st.info("📥 Upload a **test CSV file** to evaluate the selected model.")
+
 
 
 
