@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
-import pickle
 import numpy as np
+import pickle
 
 from sklearn.metrics import (
     accuracy_score,
@@ -16,15 +16,15 @@ from sklearn.metrics import (
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# ---------------------------
+# ---------------------------------------------------
 # App Configuration
-# ---------------------------
+# ---------------------------------------------------
 st.set_page_config(page_title="Wine Classification", layout="wide")
 st.title("🍷 Wine Classification – ML Model Evaluation")
 
-# ---------------------------
+# ---------------------------------------------------
 # Model Paths
-# ---------------------------
+# ---------------------------------------------------
 MODEL_PATHS = {
     "Logistic Regression": "model/logistic_regression.pkl",
     "Decision Tree": "model/decision_tree.pkl",
@@ -34,9 +34,9 @@ MODEL_PATHS = {
     "XGBoost": "model/xgboost.pkl"
 }
 
-# ---------------------------
+# ---------------------------------------------------
 # Sidebar Controls
-# ---------------------------
+# ---------------------------------------------------
 st.sidebar.header("⚙️ Controls")
 
 selected_model = st.sidebar.selectbox(
@@ -49,50 +49,52 @@ uploaded_file = st.sidebar.file_uploader(
     type=["csv"]
 )
 
-# ---------------------------
-# Load Selected Model
-# ---------------------------
+# ---------------------------------------------------
+# Load Selected Model Safely
+# ---------------------------------------------------
 try:
     with open(MODEL_PATHS[selected_model], "rb") as f:
         model = pickle.load(f)
 except Exception:
-    st.error("❌ Failed to load model file.")
+    st.error("❌ Failed to load selected model.")
     st.stop()
 
-# ---------------------------
-# Get Expected Features (Safe)
-# ---------------------------
+# ---------------------------------------------------
+# Get Expected Feature Names (if available)
+# ---------------------------------------------------
 if hasattr(model, "feature_names_in_"):
     expected_features = list(model.feature_names_in_)
 else:
     expected_features = None
 
-# ---------------------------
-# Show Model Comparison Table
-# ---------------------------
+# ---------------------------------------------------
+# Display Model Comparison Table
+# ---------------------------------------------------
 try:
     metrics_df = pd.read_csv("model/model_metrics.csv")
     st.subheader("📊 Model Comparison Table")
     st.dataframe(metrics_df, use_container_width=True)
 except:
-    st.warning("Model metrics file not found.")
+    st.warning("⚠️ model_metrics.csv not found in model folder.")
 
-# ---------------------------
+# ---------------------------------------------------
 # Dataset Processing
-# ---------------------------
+# ---------------------------------------------------
 if uploaded_file is not None:
 
     try:
         data = pd.read_csv(uploaded_file)
-    except:
-        st.error("❌ Failed to read CSV file.")
+    except Exception:
+        st.error("❌ Unable to read uploaded CSV file.")
         st.stop()
 
     st.subheader("📂 Uploaded Dataset")
     st.dataframe(data.head(), use_container_width=True)
 
     try:
-        # Separate target if exists
+        # -------------------------------------------
+        # Separate Target (if exists)
+        # -------------------------------------------
         if "target" in data.columns:
             y_true = data["target"]
             X = data.drop("target", axis=1)
@@ -100,37 +102,50 @@ if uploaded_file is not None:
             y_true = None
             X = data.copy()
 
-        # ---------------------------
-        # Align Features (If Available)
-        # ---------------------------
+        # -------------------------------------------
+        # Align Features to Training Features
+        # -------------------------------------------
         if expected_features is not None:
 
-            # Check for missing required columns
-            missing_cols = [col for col in expected_features if col not in X.columns]
+            missing_cols = [
+                col for col in expected_features
+                if col not in X.columns
+            ]
+
             if missing_cols:
                 st.error(f"❌ Missing required columns: {missing_cols}")
                 st.stop()
 
-            # Keep only expected columns in correct order
+            # Keep only expected columns (drop extra automatically)
             X = X[expected_features]
 
-        # ---------------------------
+        # -------------------------------------------
         # Convert to Numeric
-        # ---------------------------
+        # -------------------------------------------
         X = X.apply(pd.to_numeric, errors="coerce")
 
+        # -------------------------------------------
+        # Handle Missing / Non-Numeric Values
+        # -------------------------------------------
         if X.isnull().sum().sum() > 0:
-            st.error("❌ Dataset contains non-numeric or missing values.")
-            st.stop()
+            st.warning("⚠️ Missing or non-numeric values detected. Cleaning dataset...")
 
-        # ---------------------------
+            # Fill numeric missing values with column mean
+            X = X.fillna(X.mean())
+
+            # Drop columns that are still fully NaN
+            X = X.dropna(axis=1)
+
+            st.success("✅ Dataset cleaned successfully.")
+
+        # -------------------------------------------
         # Make Predictions
-        # ---------------------------
+        # -------------------------------------------
         y_pred = model.predict(X)
 
-        # ---------------------------
-        # If Target Exists → Show Metrics
-        # ---------------------------
+        # -------------------------------------------
+        # If Ground Truth Available → Show Metrics
+        # -------------------------------------------
         if y_true is not None:
 
             st.subheader("✅ Model Performance")
@@ -160,16 +175,16 @@ if uploaded_file is not None:
             report_df = pd.DataFrame(report).transpose()
             st.dataframe(report_df, use_container_width=True)
 
-        # ---------------------------
-        # If No Target → Show Predictions
-        # ---------------------------
+        # -------------------------------------------
+        # If No Target → Show Predictions Only
+        # -------------------------------------------
         else:
             data["Predicted_Class"] = y_pred
             st.subheader("🔮 Prediction Results")
             st.dataframe(data, use_container_width=True)
 
-    except Exception:
-        st.error("❌ Prediction failed. Please ensure dataset matches training features.")
+    except Exception as e:
+        st.error("❌ Prediction failed. Please check dataset format.")
         st.stop()
 
 else:
