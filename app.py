@@ -1,64 +1,87 @@
+import streamlit as st
 import pandas as pd
 import joblib
 import os
-
+import matplotlib.pyplot as plt
 from sklearn.metrics import (
     accuracy_score, roc_auc_score, precision_score,
     recall_score, f1_score, matthews_corrcoef
 )
 
-from model.logistic_regression import train_lr
-from model.decision_tree import train_dt
-from model.knn import train_knn
-from model.naive_bayes import train_nb
-from model.random_forest import train_rf
-from model.xgboost_model import train_xgb
-
-# Create directory for saved models
-os.makedirs("model/saved_models", exist_ok=True)
+st.title("Wine Classification - ML Model Comparison")
 
 # Load dataset
 train_df = pd.read_csv("wine_train.csv")
 test_df = pd.read_csv("wine_test.csv")
 
-X_train = train_df.drop("target", axis=1)
-y_train = train_df["target"]
-
 X_test = test_df.drop("target", axis=1)
 y_test = test_df["target"]
 
-models = {
-    "logistic_regression": train_lr,
-    "decision_tree": train_dt,
-    "knn": train_knn,
-    "naive_bayes": train_nb,
-    "random_forest": train_rf,
-    "xgboost": train_xgb
-}
+# Load saved models
+model_dir = "model/saved_models"
+model_files = [f for f in os.listdir(model_dir) if f.endswith(".pkl")]
 
-def evaluate(model, X_test, y_test):
+models = {}
+for file in model_files:
+    model_name = file.replace(".pkl", "")
+    models[model_name] = joblib.load(os.path.join(model_dir, file))
+
+# -----------------------------
+# Model Evaluation
+# -----------------------------
+results = []
+
+for name, model in models.items():
     y_pred = model.predict(X_test)
     y_prob = model.predict_proba(X_test)[:, 1]
 
-    return {
+    results.append({
+        "Model": name,
         "Accuracy": accuracy_score(y_test, y_pred),
         "AUC": roc_auc_score(y_test, y_prob),
         "Precision": precision_score(y_test, y_pred),
         "Recall": recall_score(y_test, y_pred),
         "F1 Score": f1_score(y_test, y_pred),
         "MCC": matthews_corrcoef(y_test, y_pred)
-    }
+    })
 
-for name, train_func in models.items():
-    model = train_func(X_train, y_train)
+results_df = pd.DataFrame(results)
 
-    # Save model as .pkl
-    model_path = f"model/saved_models/{name}.pkl"
-    joblib.dump(model, model_path)
+st.subheader("📊 Model Comparison Table")
+st.dataframe(results_df)
 
-    results = evaluate(model, X_test, y_test)
+# -----------------------------
+# Plot Comparison
+# -----------------------------
+st.subheader("📈 Model Performance Comparison")
 
-    print(f"\n{name.upper()}")
-    print(f"Model saved at: {model_path}")
-    for metric, value in results.items():
-        print(f"{metric}: {value:.4f}")
+metric = st.selectbox(
+    "Select Metric to Compare",
+    ["Accuracy", "AUC", "Precision", "Recall", "F1 Score", "MCC"]
+)
+
+plt.figure()
+plt.bar(results_df["Model"], results_df[metric])
+plt.xticks(rotation=45)
+plt.ylabel(metric)
+plt.title(f"{metric} Comparison Across Models")
+
+st.pyplot(plt)
+
+# -----------------------------
+# Prediction Section
+# -----------------------------
+st.subheader("🔍 Make a Prediction")
+
+selected_model_name = st.selectbox("Choose Model", list(models.keys()))
+selected_model = models[selected_model_name]
+
+input_data = []
+
+for column in X_test.columns:
+    value = st.number_input(f"Enter {column}", value=float(X_test[column].mean()))
+    input_data.append(value)
+
+if st.button("Predict"):
+    prediction = selected_model.predict([input_data])
+    st.success(f"Prediction: {prediction[0]}")
