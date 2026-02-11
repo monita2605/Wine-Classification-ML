@@ -24,6 +24,13 @@ The models are implemented using a Pipeline-based architecture to ensure proper 
 
 The dataset used in this project is the Wine Dataset, which contains chemical analysis results of wines derived from three different cultivars.
 
+## Saved Models
+All trained models are saved in `.pkl` format using `joblib` inside:
+
+model/saved_models/
+
+These files can be loaded later for inference without retraining.
+
 
 
 Each sample represents a wine instance described by 13 numerical features.
@@ -237,4 +244,5 @@ The ensemble models — particularly XGBoost and Random Forest — clearly outpe
 
 
 Therefore, XGBoost is selected as the best overall performing model for the Wine Classification dataset due to its strong balance across all evaluation metrics.
+
 
