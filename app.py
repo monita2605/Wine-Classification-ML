@@ -70,12 +70,11 @@ st.dataframe(metrics_df, use_container_width=True)
 if uploaded_file is not None:
     data = pd.read_csv(uploaded_file)
 
-    if "target" not in data.columns:
-        st.error("❌ Uploaded CSV must contain a 'target' column")
-        st.stop()
+   X = data
+y_pred = model.predict(X)
 
-    X = data.drop("target", axis=1)
-    y_true = data["target"]
+data["Predicted_Class"] = y_pred
+st.dataframe(data)
 
     # Prediction
     y_pred = model.predict(X)
@@ -119,3 +118,4 @@ if uploaded_file is not None:
 
 else:
     st.info("📥 Upload a **test CSV file** to evaluate the selected model.")
+
