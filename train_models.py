@@ -93,5 +93,4 @@ def main():
     print(results_df)
 
 
-if __name__ == "__main__":
-    main()
+
