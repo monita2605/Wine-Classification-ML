@@ -1,4 +1,4 @@
-import streamlit as st
+      import streamlit as st
 import pandas as pd
 import numpy as np
 import pickle
@@ -50,13 +50,19 @@ uploaded_file = st.sidebar.file_uploader(
 )
 
 # ---------------------------
-# Load Selected Model
+# Load Model
 # ---------------------------
 with open(MODEL_PATHS[selected_model_name], "rb") as f:
     model = pickle.load(f)
 
+# Get training feature names (from pipeline if available)
+if hasattr(model, "feature_names_in_"):
+    expected_columns = list(model.feature_names_in_)
+else:
+    expected_columns = None
+
 # ---------------------------
-# Load Model Comparison Metrics
+# Load Comparison Metrics
 # ---------------------------
 try:
     metrics_df = pd.read_csv("model/model_metrics.csv")
@@ -71,60 +77,82 @@ except:
 if uploaded_file is not None:
 
     data = pd.read_csv(uploaded_file)
-
     st.subheader("📂 Uploaded Dataset")
     st.dataframe(data.head(), use_container_width=True)
 
-    # ---------------------------------
-    # If dataset contains target column
-    # ---------------------------------
-    if "target" in data.columns:
+    try:
+        # Separate target if exists
+        if "target" in data.columns:
+            y_true = data["target"]
+            X = data.drop("target", axis=1)
+        else:
+            y_true = None
+            X = data.copy()
 
-        X = data.drop("target", axis=1)
-        y_true = data["target"]
+        # Align columns with training features
+        if expected_columns is not None:
+            missing_cols = set(expected_columns) - set(X.columns)
+            extra_cols = set(X.columns) - set(expected_columns)
 
+            if missing_cols:
+                st.error(f"Missing required columns: {missing_cols}")
+                st.stop()
+
+            # Keep only required columns in correct order
+            X = X[expected_columns]
+
+        # Convert to numeric
+        X = X.apply(pd.to_numeric, errors="coerce")
+
+        if X.isnull().sum().sum() > 0:
+            st.error("Dataset contains non-numeric or missing values.")
+            st.stop()
+
+        # Make prediction
         y_pred = model.predict(X)
 
-        st.subheader("✅ Model Performance on Uploaded Dataset")
+        # -------------------------
+        # If target exists → Show metrics
+        # -------------------------
+        if y_true is not None:
 
-        col1, col2, col3 = st.columns(3)
-        col1.metric("Accuracy", f"{accuracy_score(y_true, y_pred):.4f}")
-        col2.metric("Precision", f"{precision_score(y_true, y_pred, average='weighted'):.4f}")
-        col3.metric("Recall", f"{recall_score(y_true, y_pred, average='weighted'):.4f}")
+            st.subheader("✅ Model Performance")
 
-        col4, col5 = st.columns(2)
-        col4.metric("F1 Score", f"{f1_score(y_true, y_pred, average='weighted'):.4f}")
-        col5.metric("MCC", f"{matthews_corrcoef(y_true, y_pred):.4f}")
+            col1, col2, col3 = st.columns(3)
+            col1.metric("Accuracy", f"{accuracy_score(y_true, y_pred):.4f}")
+            col2.metric("Precision", f"{precision_score(y_true, y_pred, average='weighted'):.4f}")
+            col3.metric("Recall", f"{recall_score(y_true, y_pred, average='weighted'):.4f}")
 
-        # Confusion Matrix
-        st.subheader("🧩 Confusion Matrix")
+            col4, col5 = st.columns(2)
+            col4.metric("F1 Score", f"{f1_score(y_true, y_pred, average='weighted'):.4f}")
+            col5.metric("MCC", f"{matthews_corrcoef(y_true, y_pred):.4f}")
 
-        cm = confusion_matrix(y_true, y_pred)
-        fig, ax = plt.subplots()
-        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax)
-        ax.set_xlabel("Predicted")
-        ax.set_ylabel("Actual")
+            # Confusion Matrix
+            st.subheader("🧩 Confusion Matrix")
+            cm = confusion_matrix(y_true, y_pred)
+            fig, ax = plt.subplots()
+            sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax)
+            ax.set_xlabel("Predicted")
+            ax.set_ylabel("Actual")
+            st.pyplot(fig)
 
-        st.pyplot(fig)
+            # Classification Report
+            st.subheader("📄 Classification Report")
+            report = classification_report(y_true, y_pred, output_dict=True)
+            report_df = pd.DataFrame(report).transpose()
+            st.dataframe(report_df, use_container_width=True)
 
-        # Classification Report
-        st.subheader("📄 Classification Report")
-        report = classification_report(y_true, y_pred, output_dict=True)
-        report_df = pd.DataFrame(report).transpose()
-        st.dataframe(report_df, use_container_width=True)
+        # -------------------------
+        # If no target → Show predictions only
+        # -------------------------
+        else:
+            data["Predicted_Class"] = y_pred
+            st.subheader("🔮 Prediction Results")
+            st.dataframe(data, use_container_width=True)
 
-    # ---------------------------------
-    # If dataset does NOT contain target
-    # ---------------------------------
-    else:
-
-        X = data.copy()
-        y_pred = model.predict(X)
-
-        data["Predicted_Class"] = y_pred
-
-        st.subheader("🔮 Prediction Results")
-        st.dataframe(data, use_container_width=True)
+    except Exception as e:
+        st.error("❌ Prediction failed. Please ensure the dataset matches training features.")
+        st.stop()
 
 else:
     st.info("📥 Upload a CSV dataset to begin.")
