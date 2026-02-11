@@ -1,104 +1,48 @@
 import streamlit as st
-import pandas as pd
-import numpy as np
 import pickle
-from sklearn.metrics import (
-    accuracy_score, precision_score, recall_score,
-    f1_score, confusion_matrix, classification_report
-)
-import seaborn as sns
-import matplotlib.pyplot as plt
+import numpy as np
 
 # ---------------------------
-# Page config
+# Load model
 # ---------------------------
-st.set_page_config(page_title="Wine Classification ML App", layout="centered")
-st.title("🍷 Wine Classification using Machine Learning")
-
-# ---------------------------
-# Load models & scaler
-# ---------------------------
-models = {
-    "Logistic Regression": "model/logistic_regression.pkl",
-    "Decision Tree": "model/decision_tree.pkl",
-    "Random Forest": "model/random_forest.pkl",
-    "KNN": "model/knn.pkl",
-    "Naive Bayes": "model/naive_bayes.pkl",
-    "XGBoost": "model/xgboost.pkl"
-}
-
-with open("model/scaler.pkl", "rb") as f:
-    scaler = pickle.load(f)
-
-# ---------------------------
-# Model selection (Requirement b)
-# ---------------------------
-model_name = st.selectbox("Select a Model", list(models.keys()))
-
-with open(models[model_name], "rb") as f:
+with open("model/logistic_regression.pkl", "rb") as f:
     model = pickle.load(f)
 
 # ---------------------------
-# Dataset upload (Requirement a)
+# Streamlit UI
 # ---------------------------
-st.subheader("📂 Upload Test Dataset (CSV only)")
+st.set_page_config(page_title="Wine Classification", layout="centered")
+st.title("🍷 Wine Classification – Logistic Regression")
 
-uploaded_file = st.file_uploader(
-    "Upload test CSV file (must contain target column)",
-    type=["csv"]
-)
+feature_names = [
+    "Alcohol",
+    "Malic Acid",
+    "Ash",
+    "Alcalinity of Ash",
+    "Magnesium",
+    "Total Phenols",
+    "Flavanoids",
+    "Nonflavanoid Phenols",
+    "Proanthocyanins",
+    "Color Intensity",
+    "Hue",
+    "OD280/OD315 of Diluted Wines",
+    "Proline"
+]
 
-if uploaded_file is not None:
-    data = pd.read_csv(uploaded_file)
+inputs = []
 
-    st.write("### Preview of Uploaded Data")
-    st.dataframe(data.head())
+for feature in feature_names:
+    inputs.append(st.number_input(feature, value=0.0))
 
-    if "target" not in data.columns:
-        st.error("❌ CSV must contain a 'target' column")
+if st.button("Predict Wine Class"):
+    values = np.array(inputs).reshape(1, -1)
+
+    if values.shape[1] != model.n_features_in_:
+        st.error(
+            f"Model expects {model.n_features_in_} features, "
+            f"but received {values.shape[1]}"
+        )
     else:
-        X = data.drop("target", axis=1)
-        y = data["target"]
-
-        # Scaling
-        X_scaled = scaler.transform(X)
-
-        # Prediction
-        y_pred = model.predict(X_scaled)
-
-        # ---------------------------
-        # Evaluation Metrics (Requirement c)
-        # ---------------------------
-        st.subheader("📊 Evaluation Metrics")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.metric("Accuracy", round(accuracy_score(y, y_pred), 3))
-            st.metric("Precision", round(precision_score(y, y_pred, average="weighted"), 3))
-
-        with col2:
-            st.metric("Recall", round(recall_score(y, y_pred, average="weighted"), 3))
-            st.metric("F1 Score", round(f1_score(y, y_pred, average="weighted"), 3))
-
-        # ---------------------------
-        # Confusion Matrix (Requirement d)
-        # ---------------------------
-        st.subheader("🔢 Confusion Matrix")
-
-        cm = confusion_matrix(y, y_pred)
-
-        fig, ax = plt.subplots()
-        sns.heatmap(cm, annot=True, fmt="d", cmap="Blues", ax=ax)
-        ax.set_xlabel("Predicted")
-        ax.set_ylabel("Actual")
-        st.pyplot(fig)
-
-        # ---------------------------
-        # Classification Report (Requirement d)
-        # ---------------------------
-        st.subheader("📄 Classification Report")
-
-        report = classification_report(y, y_pred, output_dict=True)
-        report_df = pd.DataFrame(report).transpose()
-        st.dataframe(report_df)
+        prediction = model.predict(values)
+        st.success(f"🍷 Predicted Wine Class: {prediction[0]}")
