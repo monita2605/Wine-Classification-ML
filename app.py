@@ -50,7 +50,7 @@ uploaded_file = st.sidebar.file_uploader(
 )
 
 # =====================================================
-# Load Model (Cached)
+# Load Model
 # =====================================================
 @st.cache_resource
 def load_model(path):
@@ -64,22 +64,19 @@ except Exception as e:
     st.stop()
 
 # =====================================================
-# Get Expected Features
+# Expected Features (if available)
 # =====================================================
-if hasattr(model, "feature_names_in_"):
-    expected_features = list(model.feature_names_in_)
-else:
-    expected_features = None
+expected_features = getattr(model, "feature_names_in_", None)
 
 # =====================================================
-# Show Model Comparison Table
+# Model Comparison Table
 # =====================================================
 try:
     metrics_df = pd.read_csv("model/model_metrics.csv")
     st.subheader("📊 Model Comparison Table")
     st.dataframe(metrics_df, use_container_width=True)
 except:
-    st.warning("⚠️ model_metrics.csv not found in model folder.")
+    st.warning("⚠️ model_metrics.csv not found.")
 
 # =====================================================
 # Dataset Processing
@@ -92,64 +89,64 @@ if uploaded_file is not None:
         st.error(f"❌ Unable to read CSV: {e}")
         st.stop()
 
-    st.subheader("📂 Uploaded Dataset Preview")
+    st.subheader("📂 Dataset Preview")
     st.dataframe(data.head(), use_container_width=True)
 
     try:
-        # -------------------------------------------------
-        # Separate Target (Optional)
-        # -------------------------------------------------
+        # ---------------------------------------------
+        # Separate target if present
+        # ---------------------------------------------
         if "target" in data.columns:
             y_true = data["target"]
-            X = data.drop("target", axis=1)
+            X = data.drop(columns=["target"])
         else:
             y_true = None
             X = data.copy()
 
-        # -------------------------------------------------
-        # Align Features
-        # -------------------------------------------------
+        # ---------------------------------------------
+        # Feature Alignment
+        # ---------------------------------------------
         if expected_features is not None:
 
-            # Add missing columns as 0
+            # Add missing columns
             for col in expected_features:
                 if col not in X.columns:
                     X[col] = 0
 
-            # Remove extra columns
-            X = X[expected_features]
+            # Keep only training columns and order them
+            X = X[list(expected_features)]
 
-        # -------------------------------------------------
-        # Convert to Numeric
-        # -------------------------------------------------
+        # ---------------------------------------------
+        # Convert to numeric
+        # ---------------------------------------------
         X = X.apply(pd.to_numeric, errors="coerce")
 
-        # -------------------------------------------------
-        # Fill Missing Values with Column Means
-        # -------------------------------------------------
-        if X.isnull().sum().sum() > 0:
-            st.warning("⚠️ Missing/non-numeric values detected. Filling with column means.")
-            X = X.fillna(X.mean())
+        # ---------------------------------------------
+        # Drop fully invalid columns
+        # ---------------------------------------------
+        all_nan_cols = X.columns[X.isnull().all()].tolist()
+        if len(all_nan_cols) > 0:
+            X = X.drop(columns=all_nan_cols)
 
-        # Final NaN check
+        # ---------------------------------------------
+        # Fill missing values safely
+        # ---------------------------------------------
+        X = X.fillna(X.mean(numeric_only=True))
+        X = X.fillna(0)
+
+        # Final safety check
         if X.isnull().sum().sum() > 0:
-            st.error("❌ Dataset still contains invalid values after cleaning.")
+            st.error("❌ Dataset still contains invalid values.")
             st.stop()
 
-        # Final shape safety check
-        if expected_features is not None:
-            if X.shape[1] != len(expected_features):
-                st.error("❌ Feature count mismatch.")
-                st.stop()
-
-        # -------------------------------------------------
-        # Make Predictions
-        # -------------------------------------------------
+        # ---------------------------------------------
+        # Predict
+        # ---------------------------------------------
         y_pred = model.predict(X)
 
-        # =================================================
-        # If Ground Truth Exists → Show Metrics
-        # =================================================
+        # =============================================
+        # If ground truth exists → evaluation
+        # =============================================
         if y_true is not None:
 
             st.subheader("✅ Model Performance")
@@ -163,7 +160,6 @@ if uploaded_file is not None:
             col4.metric("F1 Score", f"{f1_score(y_true, y_pred, average='weighted'):.4f}")
             col5.metric("MCC", f"{matthews_corrcoef(y_true, y_pred):.4f}")
 
-            # Confusion Matrix
             st.subheader("🧩 Confusion Matrix")
             cm = confusion_matrix(y_true, y_pred)
 
@@ -173,27 +169,26 @@ if uploaded_file is not None:
             ax.set_ylabel("Actual")
             st.pyplot(fig)
 
-            # Classification Report
             st.subheader("📄 Classification Report")
             report = classification_report(y_true, y_pred, output_dict=True)
             report_df = pd.DataFrame(report).transpose()
             st.dataframe(report_df, use_container_width=True)
 
-        # =================================================
-        # If No Target → Show Predictions + Download
-        # =================================================
+        # =============================================
+        # If no target → prediction mode
+        # =============================================
         else:
             data["Predicted_Class"] = y_pred
 
-            st.subheader("🔮 Prediction Results")
+            st.subheader("🔮 Predictions")
             st.dataframe(data, use_container_width=True)
 
             csv = data.to_csv(index=False).encode("utf-8")
             st.download_button(
-                label="⬇ Download Predictions CSV",
-                data=csv,
-                file_name="predictions.csv",
-                mime="text/csv",
+                "⬇ Download Predictions",
+                csv,
+                "predictions.csv",
+                "text/csv"
             )
 
     except Exception as e:
