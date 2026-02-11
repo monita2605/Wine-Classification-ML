@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 
 # ---------------------------
-# App Config
+# App Configuration
 # ---------------------------
 st.set_page_config(page_title="Wine Classification", layout="wide")
 st.title("🍷 Wine Classification – ML Model Evaluation")
@@ -35,7 +35,7 @@ MODEL_PATHS = {
 }
 
 # ---------------------------
-# Sidebar
+# Sidebar Controls
 # ---------------------------
 st.sidebar.header("⚙️ Controls")
 
@@ -50,23 +50,25 @@ uploaded_file = st.sidebar.file_uploader(
 )
 
 # ---------------------------
-# Load Model
+# Load Selected Model
 # ---------------------------
-with open(MODEL_PATHS[selected_model], "rb") as f:
-    model = pickle.load(f)
-
-# Align features if model contains feature names
-if expected_features is not None:
-    missing_cols = [col for col in expected_features if col not in X.columns]
-
-    if missing_cols:
-        st.error(f"❌ Missing required columns: {missing_cols}")
-        st.stop()
-
-    X = X[expected_features]
+try:
+    with open(MODEL_PATHS[selected_model], "rb") as f:
+        model = pickle.load(f)
+except Exception:
+    st.error("❌ Failed to load model file.")
+    st.stop()
 
 # ---------------------------
-# Show Comparison Table
+# Get Expected Features (Safe)
+# ---------------------------
+if hasattr(model, "feature_names_in_"):
+    expected_features = list(model.feature_names_in_)
+else:
+    expected_features = None
+
+# ---------------------------
+# Show Model Comparison Table
 # ---------------------------
 try:
     metrics_df = pd.read_csv("model/model_metrics.csv")
@@ -80,7 +82,11 @@ except:
 # ---------------------------
 if uploaded_file is not None:
 
-    data = pd.read_csv(uploaded_file)
+    try:
+        data = pd.read_csv(uploaded_file)
+    except:
+        st.error("❌ Failed to read CSV file.")
+        st.stop()
 
     st.subheader("📂 Uploaded Dataset")
     st.dataframe(data.head(), use_container_width=True)
@@ -94,25 +100,37 @@ if uploaded_file is not None:
             y_true = None
             X = data.copy()
 
-        # Align features
-        missing_cols = [col for col in expected_features if col not in X.columns]
-        if missing_cols:
-            st.error(f"❌ Missing required columns: {missing_cols}")
-            st.stop()
+        # ---------------------------
+        # Align Features (If Available)
+        # ---------------------------
+        if expected_features is not None:
 
-        X = X[expected_features]
+            # Check for missing required columns
+            missing_cols = [col for col in expected_features if col not in X.columns]
+            if missing_cols:
+                st.error(f"❌ Missing required columns: {missing_cols}")
+                st.stop()
 
-        # Convert to numeric
+            # Keep only expected columns in correct order
+            X = X[expected_features]
+
+        # ---------------------------
+        # Convert to Numeric
+        # ---------------------------
         X = X.apply(pd.to_numeric, errors="coerce")
 
         if X.isnull().sum().sum() > 0:
             st.error("❌ Dataset contains non-numeric or missing values.")
             st.stop()
 
-        # Prediction
+        # ---------------------------
+        # Make Predictions
+        # ---------------------------
         y_pred = model.predict(X)
 
-        # If ground truth available
+        # ---------------------------
+        # If Target Exists → Show Metrics
+        # ---------------------------
         if y_true is not None:
 
             st.subheader("✅ Model Performance")
@@ -142,14 +160,17 @@ if uploaded_file is not None:
             report_df = pd.DataFrame(report).transpose()
             st.dataframe(report_df, use_container_width=True)
 
+        # ---------------------------
+        # If No Target → Show Predictions
+        # ---------------------------
         else:
             data["Predicted_Class"] = y_pred
             st.subheader("🔮 Prediction Results")
             st.dataframe(data, use_container_width=True)
 
-    except Exception as e:
+    except Exception:
         st.error("❌ Prediction failed. Please ensure dataset matches training features.")
+        st.stop()
 
 else:
-
     st.info("📥 Upload a CSV dataset to begin.")
