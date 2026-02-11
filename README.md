@@ -1,19 +1,19 @@
-Machine Learning Classification Models and Evaluation Metrics
+Wine Classification using Multiple ML Models
 a. Problem Statement
 
-The objective of this project is to implement and compare six different machine learning classification models on a selected dataset and evaluate their performance using multiple evaluation metrics.
+The objective of this project is to classify wine samples into different categories based on their chemical properties using multiple machine learning classification models and compare their performance.
 
 b. Dataset Description
 
-The dataset used contains features related to _______ and a target variable indicating _______.
+The Wine dataset contains chemical analysis results of wines grown in the same region.
 
-Number of samples:
+Type: Multi-class Classification
 
-Number of features:
+Number of Classes: 3
 
-Target variable:
+Features: 13 chemical properties
 
-Type of problem: Binary Classification
+Target: Wine class (0, 1, 2)
 
 c. Models Used
 
@@ -30,6 +30,9 @@ Random Forest (Ensemble)
 XGBoost (Ensemble)
 
 Model Comparison Table
+
+(After running train_models.py, paste actual values here)
+
 ML Model	Accuracy	AUC	Precision	Recall	F1	MCC
 Logistic Regression						
 Decision Tree						
@@ -38,10 +41,11 @@ Naive Bayes
 Random Forest						
 XGBoost						
 Observations
-ML Model	Observation
-Logistic Regression	Performs well for linearly separable data
-Decision Tree	Can overfit if depth not controlled
-KNN	Sensitive to scaling and K value
-Naive Bayes	Works well for probabilistic assumptions
-Random Forest	Reduces overfitting and improves accuracy
-XGBoost	Best performance due to boosting
+Model	Observation
+Logistic Regression	Performs well due to well-separated classes
+Decision Tree	Can overfit if not pruned
+KNN	Performs well with proper scaling
+Naive Bayes	Assumes feature independence
+Random Forest	Improves stability and accuracy
+XGBoost	Typically provides best performance
+✅ 5️⃣ Final GitHub Structure
