@@ -1,87 +1,83 @@
 import streamlit as st
 import pandas as pd
-import joblib
+import pickle
 import os
-import matplotlib.pyplot as plt
+
 from sklearn.metrics import (
-    accuracy_score, roc_auc_score, precision_score,
-    recall_score, f1_score, matthews_corrcoef
+    accuracy_score,
+    roc_auc_score,
+    precision_score,
+    recall_score,
+    f1_score,
+    matthews_corrcoef,
+    confusion_matrix
 )
 
-st.title("Wine Classification - ML Model Comparison")
+import matplotlib.pyplot as plt
+import seaborn as sns
 
-# Load dataset
-train_df = pd.read_csv("wine_train.csv")
-test_df = pd.read_csv("wine_test.csv")
 
-X_test = test_df.drop("target", axis=1)
-y_test = test_df["target"]
+st.set_page_config(page_title="Wine Classification App", layout="centered")
+st.title("🍷 Wine Classification using ML Models")
 
-# Load saved models
-model_dir = "model/saved_models"
-model_files = [f for f in os.listdir(model_dir) if f.endswith(".pkl")]
+MODEL_OPTIONS = [
+    "logistic",
+    "decision_tree",
+    "knn",
+    "naive_bayes",
+    "random_forest",
+    "xgboost"
+]
 
-models = {}
-for file in model_files:
-    model_name = file.replace(".pkl", "")
-    models[model_name] = joblib.load(os.path.join(model_dir, file))
+uploaded_file = st.file_uploader("Upload Test Dataset (CSV)", type=["csv"])
+selected_model = st.selectbox("Select Model", MODEL_OPTIONS)
 
-# -----------------------------
-# Model Evaluation
-# -----------------------------
-results = []
+if uploaded_file is not None:
+    df = pd.read_csv(uploaded_file)
 
-for name, model in models.items():
-    y_pred = model.predict(X_test)
-    y_prob = model.predict_proba(X_test)[:, 1]
+    if "target" not in df.columns:
+        st.error("Dataset must contain 'target' column.")
+        st.stop()
 
-    results.append({
-        "Model": name,
-        "Accuracy": accuracy_score(y_test, y_pred),
-        "AUC": roc_auc_score(y_test, y_prob),
-        "Precision": precision_score(y_test, y_pred),
-        "Recall": recall_score(y_test, y_pred),
-        "F1 Score": f1_score(y_test, y_pred),
-        "MCC": matthews_corrcoef(y_test, y_pred)
-    })
+    X = df.drop("target", axis=1)
+    y = df["target"]
 
-results_df = pd.DataFrame(results)
+    # Load scaler
+    scaler = pickle.load(open("model/scaler.pkl", "rb"))
+    X_scaled = scaler.transform(X)
 
-st.subheader("📊 Model Comparison Table")
-st.dataframe(results_df)
+    # Load selected model
+    model_path = f"model/{selected_model}.pkl"
 
-# -----------------------------
-# Plot Comparison
-# -----------------------------
-st.subheader("📈 Model Performance Comparison")
+    if not os.path.exists(model_path):
+        st.error("Model file not found. Please train models first.")
+        st.stop()
 
-metric = st.selectbox(
-    "Select Metric to Compare",
-    ["Accuracy", "AUC", "Precision", "Recall", "F1 Score", "MCC"]
-)
+    model = pickle.load(open(model_path, "rb"))
+    y_pred = model.predict(X_scaled)
+    y_prob = model.predict_proba(X_scaled)
 
-plt.figure()
-plt.bar(results_df["Model"], results_df[metric])
-plt.xticks(rotation=45)
-plt.ylabel(metric)
-plt.title(f"{metric} Comparison Across Models")
+    # Metrics
+    accuracy = accuracy_score(y, y_pred)
+    auc = roc_auc_score(y, y_prob, multi_class="ovr")
+    precision = precision_score(y, y_pred, average="weighted")
+    recall = recall_score(y, y_pred, average="weighted")
+    f1 = f1_score(y, y_pred, average="weighted")
+    mcc = matthews_corrcoef(y, y_pred)
 
-st.pyplot(plt)
+    st.subheader("📊 Evaluation Metrics")
+    st.write(f"Accuracy: {accuracy:.4f}")
+    st.write(f"AUC Score: {auc:.4f}")
+    st.write(f"Precision: {precision:.4f}")
+    st.write(f"Recall: {recall:.4f}")
+    st.write(f"F1 Score: {f1:.4f}")
+    st.write(f"MCC Score: {mcc:.4f}")
 
-# -----------------------------
-# Prediction Section
-# -----------------------------
-st.subheader("🔍 Make a Prediction")
+    st.subheader("📌 Confusion Matrix")
+    cm = confusion_matrix(y, y_pred)
 
-selected_model_name = st.selectbox("Choose Model", list(models.keys()))
-selected_model = models[selected_model_name]
-
-input_data = []
-
-for column in X_test.columns:
-    value = st.number_input(f"Enter {column}", value=float(X_test[column].mean()))
-    input_data.append(value)
-
-if st.button("Predict"):
-    prediction = selected_model.predict([input_data])
-    st.success(f"Prediction: {prediction[0]}")
+    fig, ax = plt.subplots()
+    sns.heatmap(cm, annot=True, fmt="d", cmap="Blues")
+    plt.xlabel("Predicted")
+    plt.ylabel("Actual")
+    st.pyplot(fig)
