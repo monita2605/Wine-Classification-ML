@@ -107,4 +107,5 @@ metrics_df = pd.DataFrame(metrics_list)
 metrics_df.to_csv("model/model_metrics.csv", index=False)
 
 print("\n🔥 All models trained and saved successfully!")
+
 print("📊 model_metrics.csv generated.")
