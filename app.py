@@ -69,8 +69,7 @@ st.dataframe(metrics_df, use_container_width=True)
 # ---------------------------
 if uploaded_file is not None:
     data = pd.read_csv(uploaded_file)
-
-   X = data
+X = data
 y_pred = model.predict(X)
 
 data["Predicted_Class"] = y_pred
@@ -118,4 +117,5 @@ st.dataframe(data)
 
 else:
     st.info("📥 Upload a **test CSV file** to evaluate the selected model.")
+
 
