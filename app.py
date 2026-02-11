@@ -55,7 +55,15 @@ uploaded_file = st.sidebar.file_uploader(
 with open(MODEL_PATHS[selected_model], "rb") as f:
     model = pickle.load(f)
 
-expected_features = list(model.feature_names_in_)
+# Align features if model contains feature names
+if expected_features is not None:
+    missing_cols = [col for col in expected_features if col not in X.columns]
+
+    if missing_cols:
+        st.error(f"❌ Missing required columns: {missing_cols}")
+        st.stop()
+
+    X = X[expected_features]
 
 # ---------------------------
 # Show Comparison Table
@@ -143,4 +151,5 @@ if uploaded_file is not None:
         st.error("❌ Prediction failed. Please ensure dataset matches training features.")
 
 else:
+
     st.info("📥 Upload a CSV dataset to begin.")
