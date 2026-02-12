@@ -19,7 +19,7 @@ from sklearn.neighbors import KNeighborsClassifier
 from sklearn.naive_bayes import GaussianNB
 from sklearn.ensemble import RandomForestClassifier
 
-# Try importing XGBoost safely
+# Optional XGBoost
 try:
     from xgboost import XGBClassifier
     xgb_available = True
@@ -27,26 +27,19 @@ except ImportError:
     xgb_available = False
 
 
-# ✅ Get current project directory automatically
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-TRAIN_PATH = os.path.join(BASE_DIR, "wine_train.csv")
-TEST_PATH = os.path.join(BASE_DIR, "wine_test.csv")
-MODEL_DIR = os.path.join(BASE_DIR, "model")
-
-
 def load_data():
-    train_df = pd.read_csv(TRAIN_PATH)
-    test_df = pd.read_csv(TEST_PATH)
+    train_df = pd.read_csv("wine_train.csv")
+    test_df = pd.read_csv("wine_test.csv")
 
-    if "target" not in train_df.columns:
-        raise ValueError("Dataset must contain 'target' column")
+    # Automatically detect target column (last column)
+    target_column = train_df.columns[-1]
+    print(f"Detected target column: {target_column}")
 
-    X_train = train_df.drop("target", axis=1)
-    y_train = train_df["target"]
+    X_train = train_df.drop(target_column, axis=1)
+    y_train = train_df[target_column]
 
-    X_test = test_df.drop("target", axis=1)
-    y_test = test_df["target"]
+    X_test = test_df.drop(target_column, axis=1)
+    y_test = test_df[target_column]
 
     return X_train, X_test, y_train, y_test
 
@@ -56,8 +49,8 @@ def scale_data(X_train, X_test):
     X_train_scaled = scaler.fit_transform(X_train)
     X_test_scaled = scaler.transform(X_test)
 
-    os.makedirs(MODEL_DIR, exist_ok=True)
-    pickle.dump(scaler, open(os.path.join(MODEL_DIR, "scaler.pkl"), "wb"))
+    os.makedirs("model", exist_ok=True)
+    pickle.dump(scaler, open("model/scaler.pkl", "wb"))
 
     return X_train_scaled, X_test_scaled
 
@@ -108,18 +101,16 @@ def main():
     models = get_models()
     results = []
 
-    print("Training models and saving pickle files...\n")
+    print("\nTraining models and generating pickle files...\n")
 
     for name, model in models.items():
         model.fit(X_train, y_train)
         metrics = evaluate_model(model, X_test, y_test)
 
-        # Save model
-        pickle.dump(model, open(os.path.join(MODEL_DIR, f"{name}.pkl"), "wb"))
+        pickle.dump(model, open(f"model/{name}.pkl", "wb"))
 
         results.append([name] + list(metrics.values()))
-
-        print(f"{name}.pkl saved successfully")
+        print(f"✅ {name}.pkl saved")
 
     results_df = pd.DataFrame(
         results,
