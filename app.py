@@ -44,6 +44,20 @@ if uploaded_file is not None:
     X = df.drop(target_column, axis=1)
     y = df[target_column]
 
+     # ✅ Make sure only expected features are used
+    expected_features = [
+        "fixed acidity", "volatile acidity", "citric acid", "residual sugar",
+        "chlorides", "free sulfur dioxide", "total sulfur dioxide", "density",
+        "pH", "sulphates", "alcohol"
+    ]
+
+    # Keep only expected features and add missing ones
+    for col in expected_features:
+        if col not in X.columns:
+            X[col] = 0  # or fill with mean if you want
+
+    X = X[expected_features]  # reorder
+
     # Load scaler
     scaler_path = "model/scaler.pkl"
 
@@ -96,3 +110,4 @@ if uploaded_file is not None:
     plt.xlabel("Predicted")
     plt.ylabel("Actual")
     st.pyplot(fig)
+
